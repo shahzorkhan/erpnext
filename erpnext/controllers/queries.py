@@ -3,40 +3,19 @@
 
 from __future__ import unicode_literals
 import frappe
-from frappe.desk.reportview import get_match_cond
-from frappe.model.db_query import DatabaseQuery
+from frappe.desk.reportview import get_match_cond, get_filters_cond
 from frappe.utils import nowdate
 
-def get_filters_cond(doctype, filters, conditions):
-	if filters:
-		flt = filters
-		if isinstance(filters, dict):
-			filters = filters.items()
-			flt = []
-			for f in filters:
-				if isinstance(f[1], basestring) and f[1][0] == '!':
-					flt.append([doctype, f[0], '!=', f[1][1:]])
-				else:
-					flt.append([doctype, f[0], '=', f[1]])
-
-		query = DatabaseQuery(doctype)
-		query.filters = flt
-		query.conditions = conditions
-		query.build_filter_conditions(flt, conditions)
-
-		cond = ' and ' + ' and '.join(query.conditions)
-	else:
-		cond = ''
-	return cond
 
  # searches for active employees
 def employee_query(doctype, txt, searchfield, start, page_len, filters):
+	conditions = []
 	return frappe.db.sql("""select name, employee_name from `tabEmployee`
 		where status = 'Active'
 			and docstatus < 2
 			and ({key} like %(txt)s
 				or employee_name like %(txt)s)
-			{mcond}
+			{fcond} {mcond}
 		order by
 			if(locate(%(_txt)s, name), locate(%(_txt)s, name), 99999),
 			if(locate(%(_txt)s, employee_name), locate(%(_txt)s, employee_name), 99999),
@@ -44,6 +23,7 @@ def employee_query(doctype, txt, searchfield, start, page_len, filters):
 			name, employee_name
 		limit %(start)s, %(page_len)s""".format(**{
 			'key': searchfield,
+			'fcond': get_filters_cond(doctype, filters, conditions),
 			'mcond': get_match_cond(doctype)
 		}), {
 			'txt': "%%%s%%" % txt,
@@ -85,7 +65,7 @@ def customer_query(doctype, txt, searchfield, start, page_len, filters):
 		fields = ["name", "customer_group", "territory"]
 	else:
 		fields = ["name", "customer_name", "customer_group", "territory"]
-		
+
 	meta = frappe.get_meta("Customer")
 	fields = fields + [f for f in meta.get_search_fields() if not f in fields]
 

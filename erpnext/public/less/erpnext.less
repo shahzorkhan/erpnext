@@ -58,9 +58,10 @@
 	line-height: 0;
 	color: @text-extra-muted;
 	font-size: 30px;
-	background-size: cover;
+	background-size: contain;
 	border: 1px solid transparent;
-	background-position: top center;
+	background-position: center;
+	background-repeat: no-repeat;
 }
 
 .pos-item-area {
@@ -75,11 +76,13 @@
 
 .item-list-area {
 	padding: 15px 0px;
+	overflow-y: scroll;
+	height: ~"calc(100vh - 162px)";
 }
 
 .pos-toolbar, .pos-bill-toolbar {
 	padding: 10px 0px;
-	border-bottom: 1px solid #d1d8dd;
+	// border-bottom: 1px solid #d1d8dd;
 	height: 51px;
 }
 
@@ -94,6 +97,7 @@
 }
 
 .pos-bill {
+	border-top: 1px solid @border-color;
 	margin-left: -15px;
 	margin-right: -15px;
 }
@@ -175,13 +179,15 @@
 }
 
 .pos-payment-row .col-xs-6 {
-	padding :10px;
+	padding :15px;
 }
 
 .pos-payment-row {
 	border-bottom:1px solid #d1d8dd;
     	margin: 2px 0px 5px 0px;
 	height: 60px;
+	margin-top: 0px;
+	margin-bottom: 0px;
 }
 
 .pos-payment-row:hover, .pos-keyboard-key:hover{
@@ -206,6 +212,10 @@
 
 .payment-toolbar {
 	padding-right: 30px;
+}
+
+.list-row-head.pos-invoice-list {
+	border-top: 1px solid @border-color;
 }
 
 body[data-route="pos"] .modal-dialog {
@@ -246,4 +256,34 @@ body[data-route="pos"] .modal-dialog {
 
 .pos-invoice-list {
 	padding: 15px 10px;
+}
+
+.write_off_amount, .change_amount {
+	margin: 15px;
+	width: 130px;
+}
+
+// assessment tool
+.frappe-control[data-fieldname='result_html'] {
+	overflow: scroll;
+}
+.assessment-result-tool {
+	table-layout: fixed;
+
+	input {
+		width: 100%;
+		border: 0;
+		outline: none;
+		text-align: right;
+	}
+
+	th {
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+
+	.total-score, .grade, .score {
+		text-align: right;
+	}
 }

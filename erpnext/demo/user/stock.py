@@ -7,6 +7,8 @@ import frappe, random
 from frappe.desk import query_report
 from erpnext.stock.stock_ledger import NegativeStockError
 from erpnext.stock.doctype.serial_no.serial_no import SerialNoRequiredError, SerialNoQtyError
+from erpnext.stock.doctype.delivery_note.delivery_note import make_sales_return
+from erpnext.stock.doctype.purchase_receipt.purchase_receipt import make_purchase_return
 
 def work():
 	frappe.set_user(frappe.db.get_global('demo_manufacturing_user'))
@@ -15,6 +17,8 @@ def work():
 	make_delivery_note()
 	make_stock_reconciliation()
 	submit_draft_stock_entries()
+	make_sales_return_records()
+	make_purchase_return_records()
 
 def make_purchase_receipt():
 	if random.random() < 0.6:
@@ -32,6 +36,7 @@ def make_purchase_receipt():
 			try:
 				pr.submit()
 			except NegativeStockError:
+				print 'Negative stock for {0}'.format(po)
 				pass
 			frappe.db.commit()
 
@@ -84,6 +89,7 @@ def submit_draft_stock_entries():
 		DuplicateEntryForProductionOrderError, OperationsNotCompleteError
 
 	# try posting older drafts (if exists)
+	frappe.db.commit()
 	for st in frappe.db.get_values("Stock Entry", {"docstatus":0}, "name"):
 		try:
 			ste = frappe.get_doc("Stock Entry", st[0])
@@ -95,3 +101,26 @@ def submit_draft_stock_entries():
 			OperationsNotCompleteError):
 			frappe.db.rollback()
 
+def make_sales_return_records():
+	if random.random() < 0.1:
+		for data in frappe.get_all('Delivery Note', fields=["name"], filters={"docstatus": 1}):
+			if random.random() < 0.1:
+				try:
+					dn = make_sales_return(data.name)
+					dn.insert()
+					dn.submit()
+					frappe.db.commit()
+				except Exception:
+					frappe.db.rollback()
+
+def make_purchase_return_records():
+	if random.random() < 0.1:
+		for data in frappe.get_all('Purchase Receipt', fields=["name"], filters={"docstatus": 1}):
+			if random.random() < 0.1:
+				try:
+					pr = make_purchase_return(data.name)
+					pr.insert()
+					pr.submit()
+					frappe.db.commit()
+				except Exception:
+					frappe.db.rollback()

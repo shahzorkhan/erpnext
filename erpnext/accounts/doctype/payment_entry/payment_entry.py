@@ -60,7 +60,14 @@ class PaymentEntry(AccountsController):
 		self.setup_party_account_field()
 		self.make_gl_entries(cancel=1)
 		self.update_advance_paid()
-							
+		self.delink_advance_entry_references()
+	
+	def delink_advance_entry_references(self):
+		for reference in self.references:
+			if reference.reference_doctype in ("Sales Invoice", "Purchase Invoice"):
+				doc = frappe.get_doc(reference.reference_doctype, reference.reference_name)
+				doc.delink_advance_entries(self.name)
+
 	def set_missing_values(self):
 		if self.payment_type == "Internal Transfer":
 			for field in ("party", "party_balance", "total_allocated_amount", 
@@ -73,6 +80,9 @@ class PaymentEntry(AccountsController):
 				
 			if not self.party:
 				frappe.throw(_("Party is mandatory"))
+				
+			self.party_name = frappe.db.get_value(self.party_type, self.party, 
+				self.party_type.lower() + "_name")
 		
 		if self.party:
 			if not self.party_balance:
@@ -143,11 +153,11 @@ class PaymentEntry(AccountsController):
 				self.source_exchange_rate = get_average_exchange_rate(self.paid_from)
 			else:
 				self.source_exchange_rate = get_exchange_rate(self.paid_from_account_currency, 
-					self.company_currency)
+					self.company_currency, self.posting_date)
 		
 		if self.paid_to and not self.target_exchange_rate:
 			self.target_exchange_rate = get_exchange_rate(self.paid_to_account_currency, 
-				self.company_currency)
+				self.company_currency, self.posting_date)
 				
 	def validate_mandatory(self):
 		for field in ("paid_amount", "received_amount", "source_exchange_rate", "target_exchange_rate"):
@@ -247,8 +257,13 @@ class PaymentEntry(AccountsController):
 		if self.party:
 			party_amount = self.paid_amount if self.payment_type=="Receive" else self.received_amount
 			
+			total_deductions = sum([flt(d.amount) for d in self.get("deductions")])
+			
 			if self.total_allocated_amount < party_amount:
-				self.unallocated_amount = party_amount - self.total_allocated_amount
+				if self.payment_type == "Receive":
+					self.unallocated_amount = party_amount - (self.total_allocated_amount - total_deductions)
+				else:
+					self.unallocated_amount = party_amount - (self.total_allocated_amount + total_deductions)
 				
 	def set_difference_amount(self):
 		base_unallocated_amount = flt(self.unallocated_amount) * (flt(self.source_exchange_rate) 
@@ -467,12 +482,12 @@ def get_outstanding_reference_documents(args):
 				d["exchange_rate"] = frappe.db.get_value(d.voucher_type, d.voucher_no, "conversion_rate")
 
 	# Get all SO / PO which are not fully billed or aginst which full advance not paid
-	orders_to_be_billed =  get_orders_to_be_billed(args.get("party_type"), args.get("party"), 
+	orders_to_be_billed =  get_orders_to_be_billed(args.get("posting_date"),args.get("party_type"), args.get("party"), 
 		party_account_currency, company_currency)
 	
 	return negative_outstanding_invoices + outstanding_invoices + orders_to_be_billed
 	
-def get_orders_to_be_billed(party_type, party, party_account_currency, company_currency):
+def get_orders_to_be_billed(posting_date, party_type, party, party_account_currency, company_currency):
 	voucher_type = 'Sales Order' if party_type == "Customer" else 'Purchase Order'
 
 	ref_field = "base_grand_total" if party_account_currency == company_currency else "grand_total"
@@ -502,7 +517,9 @@ def get_orders_to_be_billed(party_type, party, party_account_currency, company_c
 	order_list = []
 	for d in orders:
 		d["voucher_type"] = voucher_type
-		d["exchange_rate"] = get_exchange_rate(party_account_currency, company_currency)
+		# This assumes that the exchange rate required is the one in the SO
+		d["exchange_rate"] = get_exchange_rate(party_account_currency, 
+			company_currency, posting_date)
 		order_list.append(d)
 
 	return order_list
@@ -569,23 +586,27 @@ def get_company_defaults(company):
 @frappe.whitelist()
 def get_reference_details(reference_doctype, reference_name, party_account_currency):
 	total_amount = outstanding_amount = exchange_rate = None
+	ref_doc = frappe.get_doc(reference_doctype, reference_name)
 	
 	if reference_doctype != "Journal Entry":
-		ref_doc = frappe.get_doc(reference_doctype, reference_name)
-
 		if party_account_currency == ref_doc.company_currency:
 			total_amount = ref_doc.base_grand_total
 			exchange_rate = 1
 		else:
 			total_amount = ref_doc.grand_total
+			
+			# Get the exchange rate from the original ref doc 
+			# or get it based on the posting date of the ref doc
 			exchange_rate = ref_doc.get("conversion_rate") or \
-				get_exchange_rate(party_account_currency, ref_doc.company_currency)
+				get_exchange_rate(party_account_currency, ref_doc.company_currency, ref_doc.posting_date)
 		
 		outstanding_amount = ref_doc.get("outstanding_amount") \
 			if reference_doctype in ("Sales Invoice", "Purchase Invoice") \
 			else flt(total_amount) - flt(ref_doc.advance_paid)			
 	else:
-		exchange_rate = get_exchange_rate(party_account_currency, ref_doc.company_currency)
+		# Get the exchange rate based on the posting date of the ref doc
+		exchange_rate = get_exchange_rate(party_account_currency, 
+			ref_doc.company_currency, ref_doc.posting_date)
 		
 	return frappe._dict({
 		"due_date": ref_doc.get("due_date"),
@@ -625,7 +646,7 @@ def get_payment_entry(dt, dn, party_amount=None, bank_account=None, bank_amount=
 	if party_amount:
 		grand_total = outstanding_amount = party_amount
 	elif dt in ("Sales Invoice", "Purchase Invoice"):
-		grand_total = doc.grand_total
+		grand_total = doc.base_grand_total if party_account_currency == doc.company_currency else doc.grand_total
 		outstanding_amount = doc.outstanding_amount
 	else:
 		total_field = "base_grand_total" if party_account_currency == doc.company_currency else "grand_total"
@@ -662,6 +683,7 @@ def get_payment_entry(dt, dn, party_amount=None, bank_account=None, bank_amount=
 	pe.paid_to_account_currency = party_account_currency if payment_type=="Pay" else bank.account_currency
 	pe.paid_amount = paid_amount
 	pe.received_amount = received_amount
+	pe.allocate_payment_amount = 1
 	
 	pe.append("references", {
 		"reference_doctype": dt,

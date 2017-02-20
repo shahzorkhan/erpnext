@@ -11,7 +11,7 @@ from erpnext.accounts.doctype.journal_entry.test_journal_entry import make_journ
 
 class TestPeriodClosingVoucher(unittest.TestCase):
 	def test_closing_entry(self):
-		year_start_date = get_fiscal_year(today())[1]
+		year_start_date = get_fiscal_year(today(), company="_Test Company")[1]
 
 		make_journal_entry("_Test Bank - _TC", "Sales - _TC", 400,
 			"_Test Cost Center - _TC", posting_date=now(), submit=True)
@@ -55,9 +55,8 @@ class TestPeriodClosingVoucher(unittest.TestCase):
 		if random_expense_account:
 			# Check posted value for teh above random_expense_account
 			gle_for_random_expense_account = frappe.db.sql("""
-				select debit - credit as amount,
-					debit_in_account_currency - credit_in_account_currency
-						as amount_in_account_currency
+				select sum(debit - credit) as amount,
+					sum(debit_in_account_currency - credit_in_account_currency) as amount_in_account_currency
 				from `tabGL Entry`
 				where voucher_type='Period Closing Voucher' and voucher_no=%s and account =%s""",
 				(pcv.name, random_expense_account[0].account), as_dict=True)
@@ -71,7 +70,7 @@ class TestPeriodClosingVoucher(unittest.TestCase):
 			"doctype": "Period Closing Voucher",
 			"closing_account_head": "_Test Account Reserves and Surplus - _TC",
 			"company": "_Test Company",
-			"fiscal_year": get_fiscal_year(today())[0],
+			"fiscal_year": get_fiscal_year(today(), company="_Test Company")[0],
 			"posting_date": today(),
 			"remarks": "test"
 		})

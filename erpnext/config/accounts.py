@@ -27,6 +27,12 @@ def get_data():
 					"description": _("Bank/Cash transactions against party or for internal transfer")
 				},
 				{
+					"type": "page",
+					"name": "pos",
+					"label": _("POS"),
+					"description": _("Point of Sale")
+				},
+				{
 					"type": "report",
 					"name": "Accounts Receivable",
 					"doctype": "Sales Invoice",	
@@ -57,7 +63,7 @@ def get_data():
 				{
 					"type": "doctype",
 					"name": "Account",
-					"icon": "icon-sitemap",
+					"icon": "fa fa-sitemap",
 					"label": _("Chart of Accounts"),
 					"route": "Tree/Account",
 					"description": _("Tree of financial accounts."),
@@ -193,7 +199,7 @@ def get_data():
 				{
 					"type": "doctype",
 					"name": "Cost Center",
-					"icon": "icon-sitemap",
+					"icon": "fa fa-sitemap",
 					"label": _("Chart of Cost Centers"),
 					"route": "Tree/Cost Center",
 					"description": _("Tree of financial Cost Centers."),
@@ -238,7 +244,7 @@ def get_data():
 		},
 		{
 			"label": _("Setup"),
-			"icon": "icon-cog",
+			"icon": "fa fa-cog",
 			"items": [
 				{
 					"type": "doctype",
@@ -345,7 +351,7 @@ def get_data():
 		},
 		{
 			"label": _("Other Reports"),
-			"icon": "icon-table",
+			"icon": "fa fa-table",
 			"items": [
 				{
 					"type": "report",
@@ -362,6 +368,12 @@ def get_data():
 				{
 					"type": "report",
 					"name": "Trial Balance for Party",
+					"doctype": "GL Entry",
+					"is_query_report": True,
+				},
+				{
+					"type": "report",
+					"name": "Profitability Analysis",
 					"doctype": "GL Entry",
 					"is_query_report": True,
 				},
@@ -411,7 +423,7 @@ def get_data():
 		},
 		{
 			"label": _("Help"),
-			"icon": "icon-facetime-video",
+			"icon": "fa fa-facetime-video",
 			"items": [
 				{
 					"type": "help",

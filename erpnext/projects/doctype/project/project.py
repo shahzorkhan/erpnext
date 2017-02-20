@@ -8,6 +8,8 @@ from frappe.utils import flt, getdate, get_url
 from frappe import _
 
 from frappe.model.document import Document
+from erpnext.controllers.queries import get_filters_cond
+from frappe.desk.reportview import get_match_cond
 
 class Project(Document):
 	def get_feed(self):
@@ -18,8 +20,10 @@ class Project(Document):
 		if not self.get('__unsaved') and not self.get("tasks"):
 			self.load_tasks()
 
-		self.set_onload('activity_summary', frappe.db.sql('''select activity_type, sum(hours) as total_hours
-			from `tabTimesheet Detail` where project=%s group by activity_type order by total_hours desc''', self.name, as_dict=True))
+		self.set_onload('activity_summary', frappe.db.sql('''select activity_type,
+			sum(hours) as total_hours
+			from `tabTimesheet Detail` where project=%s and docstatus < 2 group by activity_type
+			order by total_hours desc''', self.name, as_dict=True))
 
 	def __setup__(self):
 		self.onload()
@@ -28,20 +32,26 @@ class Project(Document):
 		"""Load `tasks` from the database"""
 		self.tasks = []
 		for task in self.get_tasks():
-			self.append("tasks", {
+			task_map = {
 				"title": task.subject,
 				"status": task.status,
 				"start_date": task.exp_start_date,
 				"end_date": task.exp_end_date,
 				"description": task.description,
-				"task_id": task.name
-			})
+				"task_id": task.name,
+				"task_weight": task.task_weight
+			}
+
+			self.map_custom_fields(task, task_map)
+
+			self.append("tasks", task_map)
 
 	def get_tasks(self):
 		return frappe.get_all("Task", "*", {"project": self.name}, order_by="exp_start_date asc")
 
 	def validate(self):
 		self.validate_dates()
+		self.validate_weights()
 		self.sync_tasks()
 		self.tasks = []
 		self.send_welcome_email()
@@ -50,11 +60,18 @@ class Project(Document):
 		if self.expected_start_date and self.expected_end_date:
 			if getdate(self.expected_end_date) < getdate(self.expected_start_date):
 				frappe.throw(_("Expected End Date can not be less than Expected Start Date"))
+				
+	def validate_weights(self):
+		sum = 0
+		for task in self.tasks:
+			if task.task_weight > 0:
+				sum = sum + task.task_weight
+		if sum > 0 and sum != 1:
+			frappe.throw(_("Total of all task weights should be 1. Please adjust weights of all Project tasks accordingly"))
 
 	def sync_tasks(self):
 		"""sync tasks and remove table"""
 		if self.flags.dont_sync_tasks: return
-
 		task_names = []
 		for t in self.tasks:
 			if t.task_id:
@@ -62,14 +79,16 @@ class Project(Document):
 			else:
 				task = frappe.new_doc("Task")
 				task.project = self.name
-
 			task.update({
 				"subject": t.title,
 				"status": t.status,
 				"exp_start_date": t.start_date,
 				"exp_end_date": t.end_date,
 				"description": t.description,
+				"task_weight": t.task_weight
 			})
+
+			self.map_custom_fields(t, task)
 
 			task.flags.ignore_links = True
 			task.flags.from_project = True
@@ -84,6 +103,14 @@ class Project(Document):
 		self.update_percent_complete()
 		self.update_costing()
 
+	def map_custom_fields(self, source, target):
+		project_task_custom_fields = frappe.get_all("Custom Field", {"dt": "Project Task"}, "fieldname")
+
+		for field in project_task_custom_fields:
+			target.update({
+				field.fieldname: source.get(field.fieldname)
+			})
+
 	def update_project(self):
 		self.update_percent_complete()
 		self.update_costing()
@@ -91,12 +118,27 @@ class Project(Document):
 		self.save(ignore_permissions = True)
 
 	def update_percent_complete(self):
-		total = frappe.db.sql("""select count(*) from tabTask where project=%s""", self.name)[0][0]
-		if total:
-			completed = frappe.db.sql("""select count(*) from tabTask where
+		total = frappe.db.sql("""select count(name) from tabTask where project=%s""", self.name)[0][0]
+		if (self.percent_complete_method == "Task Completion" and total > 0) or (not self.percent_complete_method and total > 0):
+			completed = frappe.db.sql("""select count(name) from tabTask where
 				project=%s and status in ('Closed', 'Cancelled')""", self.name)[0][0]
-
 			self.percent_complete = flt(flt(completed) / total * 100, 2)
+
+		if (self.percent_complete_method == "Task Progress" and total > 0):
+			progress = frappe.db.sql("""select sum(progress) from tabTask where
+				project=%s""", self.name)[0][0]
+			self.percent_complete = flt(flt(progress) / total, 2)
+
+		if (self.percent_complete_method == "Task Weight" and total > 0):
+			weight_sum = frappe.db.sql("""select sum(task_weight) from tabTask where
+				project=%s""", self.name)[0][0]
+			if weight_sum == 1:
+				weighted_progress = frappe.db.sql("""select progress,task_weight from tabTask where
+					project=%s""", self.name,as_dict=1)
+				pct_complete=0
+				for row in weighted_progress:
+					pct_complete += row["progress"] * row["task_weight"]
+				self.percent_complete = flt(flt(pct_complete), 2)
 
 	def update_costing(self):
 		from_time_sheet = frappe.db.sql("""select
@@ -187,6 +229,30 @@ def get_list_context(context=None):
 		"row_template": "templates/includes/projects/project_row.html"
 	}
 
+def get_users_for_project(doctype, txt, searchfield, start, page_len, filters):
+	conditions = []
+	return frappe.db.sql("""select name, concat_ws(' ', first_name, middle_name, last_name) 
+		from `tabUser`
+		where enabled=1
+			and name not in ("Guest", "Administrator") 
+			and ({key} like %(txt)s
+				or full_name like %(txt)s)
+			{fcond} {mcond}
+		order by
+			if(locate(%(_txt)s, name), locate(%(_txt)s, name), 99999),
+			if(locate(%(_txt)s, full_name), locate(%(_txt)s, full_name), 99999),
+			idx desc,
+			name, full_name
+		limit %(start)s, %(page_len)s""".format(**{
+			'key': searchfield,
+			'fcond': get_filters_cond(doctype, filters, conditions),
+			'mcond': get_match_cond(doctype)
+		}), {
+			'txt': "%%%s%%" % txt,
+			'_txt': txt.replace("%", ""),
+			'start': start,
+			'page_len': page_len
+		})
 
 @frappe.whitelist()
 def get_cost_center_name(project):

@@ -6,13 +6,24 @@
 frappe.provide("erpnext.stock");
 frappe.provide("erpnext.stock.delivery_note");
 
-frappe.ui.form.on('Delivery Note', 'onload', function(frm) {
-	frm.set_indicator_formatter('item_code',
-		function(doc) {
-			return (doc.docstatus==1 || doc.qty<=doc.actual_qty) ? "green" : "orange"
+frappe.ui.form.on("Delivery Note", {
+	setup: function(frm) {
+		frm.set_indicator_formatter('item_code',
+			function(doc) {
+				return (doc.docstatus==1 || doc.qty<=doc.actual_qty) ? "green" : "orange"
+			})
+
+		frm.set_query("warehouse", "items", function() {
+			return {
+				filters: [
+					["Warehouse", "company", "in", ["", cstr(frm.doc.company)]],
+					["Warehouse", "is_group", "=", 0]
+				]
+			}
 		})
 
-})
+	}
+});
 
 erpnext.stock.DeliveryNoteController = erpnext.selling.SellingController.extend({
 	refresh: function(doc, dt, dn) {
@@ -125,13 +136,6 @@ erpnext.stock.DeliveryNoteController = erpnext.selling.SellingController.extend(
 
 // for backward compatibility: combine new and previous states
 $.extend(cur_frm.cscript, new erpnext.stock.DeliveryNoteController({frm: cur_frm}));
-
-cur_frm.cscript.new_contact = function(){
-	tn = frappe.model.make_new_doc_and_get_name('Contact');
-	locals['Contact'][tn].is_customer = 1;
-	if(doc.customer) locals['Contact'][tn].customer = doc.customer;
-	frappe.set_route('Form', 'Contact', tn);
-}
 
 
 cur_frm.cscript.update_status = function(status) {

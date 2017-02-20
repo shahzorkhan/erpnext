@@ -20,6 +20,13 @@ erpnext.accounts.SalesInvoiceController = erpnext.selling.SellingController.exte
 		erpnext.queries.setup_queries(this.frm, "Warehouse", function() {
 			return erpnext.queries.warehouse(me.frm.doc);
 		});
+
+		if(this.frm.doc.__islocal && this.frm.doc.is_pos) {
+			//Load pos profile data on the invoice if the default value of Is POS is 1
+
+			me.frm.script_manager.trigger("is_pos");
+			me.frm.refresh_fields();
+		}
 	},
 
 	refresh: function(doc, dt, dn) {
@@ -263,10 +270,21 @@ erpnext.accounts.SalesInvoiceController = erpnext.selling.SellingController.exte
 				});
 			}
 		}
+		else this.frm.trigger("refresh")
 	},
 
 	amount: function(){
 		this.write_off_outstanding_amount_automatically()
+	},
+
+	change_amount: function(){
+		if(this.frm.doc.paid_amount > this.frm.doc.grand_total){
+			this.calculate_write_off_amount()
+		}else {
+			this.frm.set_value("change_amount", 0.0)
+		}
+
+		this.frm.refresh_fields();
 	}
 });
 
@@ -290,7 +308,7 @@ cur_frm.cscript.hide_fields = function(doc) {
 
 	item_fields_stock = ['serial_no', 'batch_no', 'actual_qty', 'expense_account', 'warehouse', 'expense_account', 'warehouse']
 	cur_frm.fields_dict['items'].grid.set_column_disp(item_fields_stock,
-		(cint(doc.update_stock)==1 ? true : false));
+		(cint(doc.update_stock)==1 || cint(doc.is_return)==1 ? true : false));
 
 	// India related fields
 	if (frappe.boot.sysdefaults.country == 'India') unhide_field(['c_form_applicable', 'c_form_no']);
@@ -452,25 +470,57 @@ cur_frm.set_query("asset", "items", function(doc, cdt, cdn) {
 frappe.ui.form.on('Sales Invoice', {
 	setup: function(frm){
 		frm.fields_dict["timesheets"].grid.get_field("time_sheet").get_query = function(doc, cdt, cdn){
-			return {
-				filters: [
-					["Timesheet", "status", "in", ["Submitted", "Payslip"]]
-				]
+			return{
+				query: "erpnext.projects.doctype.timesheet.timesheet.get_timesheet",
+				filters: {'project': doc.project}
 			}
 		}
 	},
-})
 
-frappe.ui.form.on('Sales Invoice Timesheet', {
-	time_sheet: function(frm){
+	project: function(frm){
 		frm.call({
-			method: "calculate_billing_amount_from_timesheet",
+			method: "add_timesheet_data",
 			doc: frm.doc,
 			callback: function(r, rt) {
-				refresh_field('total_billing_amount')
+				refresh_field(['timesheets'])
 			}
 		})
 	}
 })
 
-cur_frm.add_fetch("time_sheet", "total_billing_amount", "billing_amount");
+frappe.ui.form.on('Sales Invoice Timesheet', {
+	time_sheet: function(frm, cdt, cdn){
+		var d = locals[cdt][cdn];
+		if(d.time_sheet) {
+			frappe.call({
+				method: "erpnext.projects.doctype.timesheet.timesheet.get_timesheet_data",
+				args: {
+					'name': d.time_sheet,
+					'project': frm.doc.project || null
+				},
+				callback: function(r, rt) {
+					if(r.message){
+						data = r.message;
+						frappe.model.set_value(cdt, cdn, "billing_hours", data.billing_hours);
+						frappe.model.set_value(cdt, cdn, "billing_amount", data.billing_amount);
+						frappe.model.set_value(cdt, cdn, "timesheet_detail", data.timesheet_detail);
+						calculate_total_billing_amount(frm)
+					}
+				}
+			})
+		}
+	}
+})
+
+var calculate_total_billing_amount =  function(frm) {
+	var doc = frm.doc;
+
+	doc.total_billing_amount = 0.0
+	if(doc.timesheets) {
+		$.each(doc.timesheets, function(index, data){
+			doc.total_billing_amount += data.billing_amount
+		})
+	}
+
+	refresh_field('total_billing_amount')
+}

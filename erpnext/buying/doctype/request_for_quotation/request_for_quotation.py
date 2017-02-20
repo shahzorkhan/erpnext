@@ -6,7 +6,7 @@ from __future__ import unicode_literals
 import frappe, json
 from frappe import _
 from frappe.model.mapper import get_mapped_doc
-from frappe.utils import get_url, random_string, cint
+from frappe.utils import get_url, cint
 from frappe.utils.user import get_user_fullname
 from frappe.utils.print_format import download_pdf
 from frappe.desk.form.load import get_attachments
@@ -39,7 +39,7 @@ class RequestforQuotation(BuyingController):
 
 	def validate_email_id(self, args):
 		if not args.email_id:
-			frappe.throw(_("Row {0}: For supplier {0} email id is required to send email").format(args.idx, args.supplier))
+			frappe.throw(_("Row {0}: For supplier {0} Email Address is required to send email").format(args.idx, args.supplier))
 
 	def on_submit(self):
 		frappe.db.set(self, 'status', 'Submitted')
@@ -131,7 +131,8 @@ class RequestforQuotation(BuyingController):
 
 	def send_email(self, data, sender, subject, message, attachments):
 		make(subject = subject, content=message,recipients=data.email_id, 
-			sender=sender,attachments = attachments, send_email=True)["name"]
+			sender=sender,attachments = attachments, send_email=True,
+		     	doctype=self.doctype, name=self.name)["name"]
 
 		frappe.msgprint(_("Email sent to supplier {0}").format(data.supplier))
 
@@ -192,8 +193,6 @@ def create_supplier_quotation(doc):
 	if isinstance(doc, basestring):
 		doc = json.loads(doc)
 
-	validate_duplicate_supplier_quotation(doc)
-
 	try:
 		sq_doc = frappe.get_doc({
 			"doctype": "Supplier Quotation",
@@ -210,7 +209,7 @@ def create_supplier_quotation(doc):
 		frappe.msgprint(_("Supplier Quotation {0} created").format(sq_doc.name))
 		return sq_doc.name
 	except Exception:
-		return
+		return None
 
 def add_items(sq_doc, supplier, items):
 	for data in items:
@@ -245,13 +244,49 @@ def get_rfq_doc(doctype, name, supplier_idx):
 		args = doc.get('suppliers')[cint(supplier_idx) - 1]
 		doc.update_supplier_part_no(args)
 		return doc
-
+		
 @frappe.whitelist()
-def validate_duplicate_supplier_quotation(args):
-	data = frappe.db.sql("""select sq.name as name from `tabSupplier Quotation` sq, 
-		`tabSupplier Quotation Item` sqi where sqi.parent = sq.name and sq.supplier = %(supplier)s 
-		and sqi.request_for_quotation = %(rfq)s and sq.docstatus < 2""",
-		{'supplier': args.get('supplier'), 'rfq': args.get('name')}, as_dict=True)
+def get_item_from_material_requests_based_on_supplier(source_name, target_doc = None):
+	mr_items_list = frappe.db.sql("""
+		SELECT
+			mr.name, mr_item.item_code
+		FROM
+			`tabItem` as item, 
+			`tabItem Supplier` as item_supp, 
+			`tabMaterial Request Item` as mr_item, 
+			`tabMaterial Request`  as mr 
+		WHERE item_supp.supplier = %(supplier)s 
+			AND item.name = item_supp.parent 
+			AND mr_item.parent = mr.name 
+			AND mr_item.item_code = item.name 
+			AND mr.status != "Stopped" 
+			AND mr.material_request_type = "Purchase" 
+			AND mr.docstatus = 1 
+			AND mr.per_ordered < 99.99""", {"supplier": source_name}, as_dict=1)
+	
+	material_requests = {}
+	for d in mr_items_list:
+		material_requests.setdefault(d.name, []).append(d.item_code)
 
-	if data and data[0] and data[0].name:
-		frappe.throw(_("Already supplier quotation has created"))
+	for mr, items in material_requests.items():
+		target_doc = get_mapped_doc("Material Request", mr, {
+			"Material Request": {
+				"doctype": "Request for Quotation",
+				"validation": {
+					"docstatus": ["=", 1],
+					"material_request_type": ["=", "Purchase"],
+				}
+			},
+			"Material Request Item": {
+				"doctype": "Request for Quotation Item",
+				"condition": lambda row: row.item_code in items,
+				"field_map": [
+					["name", "material_request_item"],
+					["parent", "material_request"],
+					["uom", "uom"]
+				]
+			}
+		}, target_doc)
+		
+	return target_doc
+		

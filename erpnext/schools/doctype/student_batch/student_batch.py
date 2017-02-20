@@ -13,7 +13,6 @@ class StudentBatch(Document):
 		if not prog_abb:
 			prog_abb = self.program
 		self.name = prog_abb + "-"+ self.student_batch_name + "-" + self.academic_year
-	
+		
 	def validate(self):
 		validate_duplicate_student(self.students)
-		

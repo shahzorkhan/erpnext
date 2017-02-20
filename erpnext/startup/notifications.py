@@ -11,8 +11,6 @@ def get_notification_config():
 			"Task": {"status": "Overdue"},
 			"Project": {"status": "Open"},
 			"Item": {"total_projected_qty": ("<", 0)},
-			"Customer": {"status": "Open"},
-			"Supplier": {"status": "Open"},
 			"Lead": {"status": "Open"},
 			"Contact": {"status": "Open"},
 			"Opportunity": {"status": "Open"},
@@ -22,12 +20,22 @@ def get_notification_config():
 				"docstatus": ("<", 2)
 			},
 			"Journal Entry": {"docstatus": 0},
-			"Sales Invoice": { "outstanding_amount": (">", 0), "docstatus": ("<", 2) },
-			"Purchase Invoice": {"docstatus": 0},
+			"Sales Invoice": {
+				"outstanding_amount": (">", 0),
+				"docstatus": ("<", 2)
+			},
+			"Purchase Invoice": {
+				"outstanding_amount": (">", 0),
+				"docstatus": ("<", 2)
+			},
+			"Payment Entry": {"docstatus": 0},
 			"Leave Application": {"status": "Open"},
 			"Expense Claim": {"approval_status": "Draft"},
 			"Job Applicant": {"status": "Open"},
-			"Delivery Note": {"docstatus": 0},
+			"Delivery Note": {
+				"status": ("not in", ("Completed", "Closed")),
+				"docstatus": ("<", 2)
+			},
 			"Stock Entry": {"docstatus": 0},
 			"Material Request": {
 				"docstatus": ("<", 2),
@@ -40,7 +48,10 @@ def get_notification_config():
 				"status": ("not in", ("Completed", "Closed")),
 				"docstatus": ("<", 2)
 			},
-			"Purchase Receipt": {"docstatus": 0},
+			"Purchase Receipt": {
+				"status": ("not in", ("Completed", "Closed")),
+				"docstatus": ("<", 2)
+			},
 			"Production Order": { "status": ("in", ("Draft", "Not Started", "In Process")) },
 			"BOM": {"docstatus": 0},
 			"Timesheet": {"status": "Draft"}

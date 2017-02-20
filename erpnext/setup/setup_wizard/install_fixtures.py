@@ -7,9 +7,12 @@ import frappe
 
 from frappe import _
 
+default_lead_sources = ["Existing Customer", "Reference", "Advertisement",
+	"Cold Calling", "Exhibition", "Supplier Reference", "Mass Mailing",
+	"Customer's Vendor", "Campaign", "Walk In"]
+
 def install(country=None):
 	records = [
-
 		# address template
 		{'doctype':"Address Template", "country": country},
 
@@ -27,11 +30,9 @@ def install(country=None):
 		{'doctype': 'Item Group', 'item_group_name': _('Consumable'),
 			'is_group': 0, 'parent_item_group': _('All Item Groups') },
 
-		# deduction type
-		{'doctype': 'Deduction Type', 'name': _('Income Tax'), 'description': _('Income Tax'), 'deduction_name': _('Income Tax')},
-
-		# earning type
-		{'doctype': 'Earning Type', 'name': _('Basic'), 'description': _('Basic'), 'earning_name': _('Basic'), 'taxable': 'Yes'},
+		# salary component
+		{'doctype': 'Salary Component', 'salary_component': _('Income Tax'), 'description': _('Income Tax'), 'type': 'Deduction'},
+		{'doctype': 'Salary Component', 'salary_component': _('Basic'), 'description': _('Basic'), 'type': 'Earning'},
 
 		# expense claim type
 		{'doctype': 'Expense Claim Type', 'name': _('Calls'), 'expense_type': _('Calls')},
@@ -149,6 +150,7 @@ def install(country=None):
 		{'doctype': 'Activity Type', 'activity_type': _('Execution')},
 		{'doctype': 'Activity Type', 'activity_type': _('Communication')},
 
+		# Lead Source
 		{'doctype': "Item Attribute", "attribute_name": _("Size"), "item_attribute_values": [
 			{"attribute_value": _("Extra Small"), "abbr": "XS"},
 			{"attribute_value": _("Small"), "abbr": "S"},
@@ -169,6 +171,10 @@ def install(country=None):
 		{'doctype': "Email Account", "email_id": "support@example.com", "append_to": "Issue"},
 		{'doctype': "Email Account", "email_id": "jobs@example.com", "append_to": "Job Applicant"},
 
+		{'doctype': "Party Type", "party_type": "Customer"},
+		{'doctype': "Party Type", "party_type": "Supplier"},
+		{'doctype': "Party Type", "party_type": "Employee"},
+
 		{"doctype": "Offer Term", "offer_term": _("Date of Joining")},
 		{"doctype": "Offer Term", "offer_term": _("Annual Salary")},
 		{"doctype": "Offer Term", "offer_term": _("Probationary Period")},
@@ -184,14 +190,13 @@ def install(country=None):
 
 		{'doctype': "Print Heading", 'print_heading': _("Credit Note")},
 		{'doctype': "Print Heading", 'print_heading': _("Debit Note")},
-
-		{"doctype": "Salary Component", "salary_component": _("Basic")},
-		{"doctype": "Salary Component", "salary_component": _("Income Tax")},
 	]
 
 	from erpnext.setup.setup_wizard.industry_type import get_industry_types
 	records += [{"doctype":"Industry Type", "industry": d} for d in get_industry_types()]
 	# records += [{"doctype":"Operation", "operation": d} for d in get_operations()]
+
+	records += [{'doctype': 'Lead Source', 'source_name': _(d)} for d in default_lead_sources]
 
 	from frappe.modules import scrub
 	for r in records:
@@ -212,4 +217,3 @@ def install(country=None):
 				pass
 			else:
 				raise
-

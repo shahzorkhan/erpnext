@@ -198,7 +198,7 @@ function hide_fields(doc) {
 	item_fields_stock = ['warehouse_section', 'received_qty', 'rejected_qty'];
 
 	cur_frm.fields_dict['items'].grid.set_column_disp(item_fields_stock,
-		(cint(doc.update_stock)==1 ? true : false));
+		(cint(doc.update_stock)==1 || cint(doc.is_return)==1 ? true : false));
 
 	cur_frm.refresh_fields();
 }
@@ -218,21 +218,10 @@ cur_frm.fields_dict.cash_bank_account.get_query = function(doc) {
 	}
 }
 
-cur_frm.fields_dict['supplier_address'].get_query = function(doc, cdt, cdn) {
-	return{
-		filters:{'supplier':  doc.supplier}
-	}
-}
-
-cur_frm.fields_dict['contact_person'].get_query = function(doc, cdt, cdn) {
-	return{
-		filters:{'supplier':  doc.supplier}
-	}
-}
-
 cur_frm.fields_dict['items'].grid.get_field("item_code").get_query = function(doc, cdt, cdn) {
 	return {
-		query: "erpnext.controllers.queries.item_query"
+		query: "erpnext.controllers.queries.item_query",
+		filters: {'is_purchase_item': 1}
 	}
 }
 
@@ -339,14 +328,20 @@ frappe.ui.form.on("Purchase Invoice", {
 		$.each(["warehouse", "rejected_warehouse"], function(i, field) {
 			frm.set_query(field, "items", function() {
 				return {
-					filters: [["Warehouse", "company", "in", ["", cstr(frm.doc.company)]]]
+					filters: [
+						["Warehouse", "company", "in", ["", cstr(frm.doc.company)]],
+						["Warehouse", "is_group", "=", 0]
+					]
 				}
 			})
 		})
 
 		frm.set_query("supplier_warehouse", function() {
 			return {
-				filters: [["Warehouse", "company", "in", ["", cstr(frm.doc.company)]]]
+				filters: [
+					["Warehouse", "company", "in", ["", cstr(frm.doc.company)]],
+					["Warehouse", "is_group", "=", 0]
+				]
 			}
 		})
 	},

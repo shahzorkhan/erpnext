@@ -7,34 +7,26 @@ frappe.provide("erpnext.stock");
 
 frappe.ui.form.on("Purchase Receipt", {
 	onload: function(frm) {
-		// default values for quotation no
-		var qa_no = frappe.meta.get_docfield("Purchase Receipt Item", "qa_no");
-		qa_no.get_route_options_for_new_doc = function(field) {
-			if(frm.is_new()) return;
-			var doc = field.doc;
-			return {
-				"inspection_type": "Incoming",
-				"purchase_receipt_no": frm.doc.name,
-				"item_code": doc.item_code,
-				"description": doc.description,
-				"item_serial_no": doc.serial_no ? doc.serial_no.split("\n")[0] : null,
-				"batch_no": doc.batch_no
-			}
-		}
-
 		$.each(["warehouse", "rejected_warehouse"], function(i, field) {
 			frm.set_query(field, "items", function() {
 				return {
-					filters: [["Warehouse", "company", "in", ["", cstr(frm.doc.company)]]]
+					filters: [
+						["Warehouse", "company", "in", ["", cstr(frm.doc.company)]],
+						["Warehouse", "is_group", "=", 0]
+					]
 				}
 			})
 		})
 
 		frm.set_query("supplier_warehouse", function() {
 			return {
-				filters: [["Warehouse", "company", "in", ["", cstr(frm.doc.company)]]]
+				filters: [
+					["Warehouse", "company", "in", ["", cstr(frm.doc.company)]],
+					["Warehouse", "is_group", "=", 0]
+				]
 			}
-		})
+		});
+
 	}
 });
 
@@ -130,26 +122,6 @@ cur_frm.cscript.update_status = function(status) {
 	})
 }
 
-cur_frm.fields_dict['supplier_address'].get_query = function(doc, cdt, cdn) {
-	return {
-		filters: { 'supplier': doc.supplier}
-	}
-}
-
-cur_frm.fields_dict['contact_person'].get_query = function(doc, cdt, cdn) {
-	return {
-		filters: { 'supplier': doc.supplier }
-	}
-}
-
-cur_frm.cscript.new_contact = function() {
-	tn = frappe.model.make_new_doc_and_get_name('Contact');
-	locals['Contact'][tn].is_supplier = 1;
-	if(doc.supplier)
-		locals['Contact'][tn].supplier = doc.supplier;
-	frappe.set_route('Form', 'Contact', tn);
-}
-
 cur_frm.fields_dict['items'].grid.get_field('project').get_query = function(doc, cdt, cdn) {
 	return {
 		filters: [
@@ -181,14 +153,6 @@ cur_frm.fields_dict['select_print_heading'].get_query = function(doc, cdt, cdn) 
 		filters: [
 			['Print Heading', 'docstatus', '!=', '2']
 		]
-	}
-}
-
-cur_frm.fields_dict.items.grid.get_field("qa_no").get_query = function(doc) {
-	return {
-		filters: {
-			'docstatus': 1
-		}
 	}
 }
 
