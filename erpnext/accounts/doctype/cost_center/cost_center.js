@@ -32,8 +32,13 @@ cur_frm.cscript.refresh = function(doc, cdt, cdn) {
 	cur_frm.toggle_display('sb1', doc.is_group==0)
 	cur_frm.set_intro(intro_txt);
 
-	cur_frm.add_custom_button(__('Chart of Cost Centers'),
-		function() { frappe.set_route("Tree", "Cost Center"); }, __("View"))
+	if(!cur_frm.doc.__islocal) {
+		cur_frm.add_custom_button(__('Chart of Cost Centers'),
+			function() { frappe.set_route("Tree", "Cost Center"); });
+
+		cur_frm.add_custom_button(__('Budget'),
+			function() { frappe.set_route("List", "Budget", {'cost_center': cur_frm.doc.name}); });
+	}
 }
 
 cur_frm.cscript.parent_cost_center = function(doc, cdt, cdn) {
@@ -45,11 +50,11 @@ cur_frm.cscript.parent_cost_center = function(doc, cdt, cdn) {
 cur_frm.cscript.hide_unhide_group_ledger = function(doc) {
 	if (doc.is_group == 1) {
 		cur_frm.add_custom_button(__('Convert to Non-Group'),
-			function() { cur_frm.cscript.convert_to_ledger(); }, "icon-retweet",
+			function() { cur_frm.cscript.convert_to_ledger(); }, "fa fa-retweet",
 				"btn-default")
 	} else if (doc.is_group == 0) {
 		cur_frm.add_custom_button(__('Convert to Group'),
-			function() { cur_frm.cscript.convert_to_group(); }, "icon-retweet",
+			function() { cur_frm.cscript.convert_to_group(); }, "fa fa-retweet",
 				"btn-default")
 	}
 }

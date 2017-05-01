@@ -6,10 +6,11 @@ from __future__ import unicode_literals
 import frappe
 from frappe import _
 from frappe.model.document import Document
-from frappe.utils import flt, get_url, nowdate
+from frappe.utils import flt, nowdate, get_url
 from erpnext.accounts.party import get_party_account
 from erpnext.accounts.utils import get_account_currency
 from erpnext.accounts.doctype.payment_entry.payment_entry import get_payment_entry, get_company_defaults
+from frappe.integrations.utils import get_payment_gateway_controller
 
 class PaymentRequest(Document):
 	def validate(self):
@@ -35,16 +36,12 @@ class PaymentRequest(Document):
 			send_mail = False
 
 		if send_mail and not self.flags.mute_email:
-			self.send_payment_request()
+			self.set_payment_request_url()
 			self.send_email()
 
 	def on_cancel(self):
+		self.check_if_payment_entry_exists()
 		self.set_as_cancelled()
-
-	def get_payment_url(self):
-		""" This is blanck method to trigger hooks call from individual payment gateway app
-		which will return respective payment gateway"""
-		pass
 
 	def make_invoice(self):
 		ref_doc = frappe.get_doc(self.reference_doctype, self.reference_name)
@@ -54,15 +51,34 @@ class PaymentRequest(Document):
 			si = si.insert(ignore_permissions=True)
 			si.submit()
 
-	def send_payment_request(self):
+	def set_payment_request_url(self):
 		if self.payment_account:
-			self.payment_url = get_url("/api/method/erpnext.accounts.doctype.payment_request.payment_request.generate_payment_request?name={0}".format(self.name))
-		
+			self.payment_url = self.get_payment_url()
+
 		if self.payment_url:
 			self.db_set('payment_url', self.payment_url)
-			
+
 		if self.payment_url or not self.payment_gateway_account:
 			self.db_set('status', 'Initiated')
+
+	def get_payment_url(self):
+		data = frappe.db.get_value(self.reference_doctype, self.reference_name,
+			["company", "customer_name"], as_dict=1)
+
+		controller = get_payment_gateway_controller(self.payment_gateway)
+		controller.validate_transaction_currency(self.currency)
+
+		return controller.get_payment_url(**{
+			"amount": flt(self.grand_total, self.precision("grand_total")),
+			"title": data.company,
+			"description": self.subject,
+			"reference_doctype": "Payment Request",
+			"reference_docname": self.name,
+			"payer_email": self.email_to or frappe.session.user,
+			"payer_name": data.customer_name,
+			"order_id": self.name,
+			"currency": self.currency
+		})
 
 	def set_as_paid(self):
 		if frappe.session.user == "Guest":
@@ -142,6 +158,13 @@ class PaymentRequest(Document):
 	def set_as_cancelled(self):
 		self.db_set("status", "Cancelled")
 
+	def check_if_payment_entry_exists(self):
+		if self.status == "Paid":
+			payment_entry = frappe.db.sql_list("""select parent from `tabPayment Entry Reference`
+				where reference_name=%s""", self.reference_name)
+			if payment_entry:
+				frappe.throw(_("Payment Entry already exists"), title=_('Error'))
+
 	def make_communication_entry(self):
 		"""Make communication entry"""
 		comm = frappe.get_doc({
@@ -156,6 +179,32 @@ class PaymentRequest(Document):
 
 	def get_payment_success_url(self):
 		return self.payment_success_url
+
+	def on_payment_authorized(self, status=None):
+		if not status:
+			return
+
+		shopping_cart_settings = frappe.get_doc("Shopping Cart Settings")
+
+		if status in ["Authorized", "Completed"]:
+			redirect_to = None
+			self.run_method("set_as_paid")
+
+			# if shopping cart enabled and in session
+			if (shopping_cart_settings.enabled and hasattr(frappe.local, "session")
+				and frappe.local.session.user != "Guest"):
+
+				success_url = shopping_cart_settings.payment_success_url
+				if success_url:
+					redirect_to = ({
+						"Orders": "orders",
+						"Invoices": "invoices",
+						"My Account": "me"
+					}).get(success_url, "me")
+				else:
+					redirect_to = get_url("/orders/{0}".format(self.reference_name))
+
+			return redirect_to
 
 @frappe.whitelist(allow_guest=True)
 def make_payment_request(**args):
@@ -185,7 +234,7 @@ def make_payment_request(**args):
 			"grand_total": grand_total,
 			"email_to": args.recipient_id or "",
 			"subject": "Payment Request for %s"%args.dn,
-			"message": gateway_account.get("message") or get_dummy_message(args.use_dummy_message),
+			"message": gateway_account.get("message") or get_dummy_message(ref_doc),
 			"reference_doctype": args.dt,
 			"reference_name": args.dn
 		})
@@ -201,8 +250,9 @@ def make_payment_request(**args):
 			pr.submit()
 
 	if hasattr(ref_doc, "order_type") and getattr(ref_doc, "order_type") == "Shopping Cart":
-		generate_payment_request(pr.name)
 		frappe.db.commit()
+		frappe.local.response["type"] = "redirect"
+		frappe.local.response["location"] = pr.get_payment_url()
 
 	if not args.cart:
 		return pr
@@ -256,10 +306,6 @@ def get_print_format_list(ref_doctype):
 	}
 
 @frappe.whitelist(allow_guest=True)
-def generate_payment_request(name):
-	frappe.get_doc("Payment Request", name).run_method("get_payment_url")
-
-@frappe.whitelist(allow_guest=True)
 def resend_payment_email(docname):
 	return frappe.get_doc("Payment Request", docname).send_email()
 
@@ -273,18 +319,24 @@ def make_status_as_paid(doc, method):
 		payment_request_name = frappe.db.get_value("Payment Request",
 			{"reference_doctype": ref.reference_doctype, "reference_name": ref.reference_name,
 			"docstatus": 1})
-		
+
 		if payment_request_name:
 			doc = frappe.get_doc("Payment Request", payment_request_name)
 			if doc.status != "Paid":
 				doc.db_set('status', 'Paid')
+				frappe.db.commit()
 
-def get_dummy_message(use_dummy_message=True):
-	return """
-		<p> Hope you are enjoying a service. Please consider bank details for payment </p>
-		<p> Bank Details <p><br>
-		<p> Bank Name : National Bank </p>
-		<p> Account Number : 123456789000872 </p>
-		<p> IFSC code : NB000001 </p>
-		<p> Account Name : Wind Power LLC </p>
-	"""
+def get_dummy_message(doc):
+	return frappe.render_template("""{% if doc.contact_person -%}
+<p>Dear {{ doc.contact_person }},</p>
+{%- else %}<p>Hello,</p>{% endif %}
+
+<p>{{ _("Requesting payment against {0} {1} for amount {2}").format(doc.doctype,
+	doc.name, doc.get_formatted("grand_total")) }}</p>
+
+<a href="{{ payment_url }}">{{ _("Make Payment") }}</a>
+
+<p>{{ _("If you have any questions, please get back to us.") }}</p>
+
+<p>{{ _("Thank you for your business!") }}</p>
+""", dict(doc=doc, payment_url = '{{ payment_url }}'))

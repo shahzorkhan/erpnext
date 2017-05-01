@@ -1,6 +1,7 @@
-Production Order (also called as Work Order) is a document that is given to
+<img class="screenshot" alt="Production Order" src="{{docs_base_url}}/assets/img/manufacturing/manufacturing-flow.png">
+A Production Order (also known as a Work Order) is a document that is given to
 the manufacturing shop floor by the Production Planner as a signal to produce
-a certain quantity of a certain Item. Production Order also helps to generate
+a certain quantity of a certain Item. The Production Order also helps to generate
 the material requirements (Stock Entry) for the Item to be produced from its
 **Bill of Materials**.
 
@@ -45,7 +46,7 @@ by:
 * Once you have submitted your Production Order, you need to Transfer the Raw Materials to initiate the Manufacturing Process.
 * This will create a Stock Entry with all the Items required to complete this Production Order to be added to the WIP Warehouse. (this will add sub-Items with BOM as one Item or explode their children based on your setting above).
 
-* Click on 'Transfer Materials for Manufacturing'.
+* Click on 'Start'.
 
 <img class="screenshot" alt="Transfer Materials" src="{{docs_base_url}}/assets/img/manufacturing/PO-material-transfer.png">
 
@@ -61,20 +62,27 @@ by:
 
 <img class="screenshot" alt="Stock Entry for PO" src="{{docs_base_url}}/assets/img/manufacturing/PO-material-transfer-updated.png">
 
+#### Material Transfer through Stock Entry
+Use cases for this option are:
+* If material transfer is done in bulk and/or is not required to be tracked against a particular Production Order
+* If the responsibility for Material Transfer and Production Entry lies with two separate users
+
+If this is the case, you can select the Skip Material Transfer check box, which will allow you to make the “Manufacture” Stock Entry directly by clicking on the ‘Finish’ button.
+
 ### Making Time Logs
 
-* Progress in the Production Order can be tracked using [Time Log]({{docs_base_url}}/user/manual/en/projects/time-log.html)
-* Time Logs are created against Production Order Operations.
-* Drafts of Time Logs are also created based on the scheduled operations when an Production Order is Submitted.
-* To create more Time Logs against an operation select 'Make TIme Log' in the respective operation.
+* Progress in the Production Order can be tracked using [Timesheet]({{docs_base_url}}/user/manual/en/projects/timesheet/timesheet-against-production-order.html)
+* Timesheet's time slots are created against Production Order Operations.
+* Drafts of Timesheet are created based on the scheduled operations when an Production Order is Submitted.
+* To create more Timesheets against an operation click 'Make Timesheet' button.
 
-<img class="screenshot" alt="Make TL against PO" src="{{docs_base_url}}/assets/img/manufacturing/PO-operations-make-tl.png">
+<img class="screenshot" alt="Make timesheet against PO" src="{{docs_base_url}}/assets/img/manufacturing/PO-operations-make-ts.png">
 
 ###Updating Finished Goods
 
 * Once you are done with the Production Order you need to update the Finished Goods.
 * This will create a Stock Entry that will deduct all the sub-Items from the WIP Warehouse and add them to the Finished Goods Warehouse.
-* Click on 'Update Finished Goods'.
+* Click on 'Finish'.
 
 <img class="screenshot" alt="Update Finished Goods" src="{{docs_base_url}}/assets/img/manufacturing/PO-FG-update.png">
 
@@ -87,7 +95,7 @@ by:
 ### Stopping a Production Order
 
 * When you stop a Production Order its status is changed to Stop indicating that all production process against that Production Order is to be ceased.
-* To stop the Production Order click on the 'stop' Button
+* To stop the Production Order click on the 'Stop' Button
 
   1. On Submitting the Production Order, the system will reserve a slot for each of the Production Order Operations serially after the planned start date based on the workstation availability. The Workstation availability depends on the Workstation timings, holiday list and if some other Production Order Operation was scheduled in that slot. You can mention the number of days for the system to try scheduling the operations in the Manufacturing Settings. This is set to 30 Days by default. If the operation requires time exceeding the available slot, system shall ask you to break the operations. Once the scheduling is done system shall create Time Logs and save them. You can Modify them and submit them later.
   2. You can also create additional time logs against an Operation. For doing so select the respective operation and click on 'Make Time Log'
@@ -97,7 +105,7 @@ by:
 
 <img class="screenshot" alt="PO - stop" src="{{docs_base_url}}/assets/img/manufacturing/PO-stop.png">
 
-* You can Also re-start a stopped Production Order.
+* You can also re-start a stopped Production Order.
 
 > Note : In order to make a Production Order against an Item you must specify 'Yes' to "Allow Production Order" on the Item form.
 

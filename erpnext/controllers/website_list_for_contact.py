@@ -18,14 +18,17 @@ def get_list_context(context=None):
 		"get_list": get_transaction_list
 	}
 
-def get_transaction_list(doctype, txt=None, filters=None, limit_start=0, limit_page_length=20):
+def get_transaction_list(doctype, txt=None, filters=None, limit_start=0, limit_page_length=20, order_by="modified"):
 	from frappe.www.list import get_list
 	user = frappe.session.user
 	key = None
 
 	if not filters: filters = []
 
-	filters.append((doctype, "docstatus", "=", 1))
+	if doctype == 'Supplier Quotation':
+		filters.append((doctype, "docstatus", "<", 2))
+	else:
+		filters.append((doctype, "docstatus", "=", 1))
 
 	if user != "Guest" and is_website_user():
 		parties_doctype = 'Request for Quotation Supplier' if doctype == 'Request for Quotation' else doctype
@@ -97,11 +100,12 @@ def post_process(doctype, data):
 
 def get_customers_suppliers(doctype, user):
 	meta = frappe.get_meta(doctype)
-	contacts = frappe.get_all("Contact", fields=["customer", "supplier", "email_id"],
-		filters={"email_id": user})
+	contacts = frappe.db.sql(""" select  `tabContact`.email_id, `tabDynamic Link`.link_doctype, `tabDynamic Link`.link_name
+		from `tabContact`, `tabDynamic Link` where
+			`tabContact`.name = `tabDynamic Link`.parent and `tabContact`.email_id =%s """, user, as_dict=1)
 
-	customers = [c.customer for c in contacts if c.customer] if meta.get_field("customer") else None
-	suppliers = [c.supplier for c in contacts if c.supplier] if meta.get_field("supplier") else None
+	customers = [c.link_name for c in contacts if c.link_doctype == 'Customer'] if meta.get_field("customer") else None
+	suppliers = [c.link_name for c in contacts if c.link_doctype == 'Supplier'] if meta.get_field("supplier") else None
 
 	return customers, suppliers
 
@@ -112,7 +116,8 @@ def has_website_permission(doc, ptype, user, verbose=False):
 		return frappe.get_all(doctype, filters=[(doctype, "customer", "in", customers),
 			(doctype, "name", "=", doc.name)]) and True or False
 	elif suppliers:
-		return frappe.get_all(doctype, filters=[(doctype, "suppliers", "in", suppliers),
+		fieldname = 'suppliers' if doctype == 'Request for Quotation' else 'supplier'
+		return frappe.get_all(doctype, filters=[(doctype, fieldname, "in", suppliers),
 			(doctype, "name", "=", doc.name)]) and True or False
 	else:
 		return False

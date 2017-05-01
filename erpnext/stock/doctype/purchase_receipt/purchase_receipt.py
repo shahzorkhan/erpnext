@@ -4,14 +4,15 @@
 from __future__ import unicode_literals
 import frappe
 
-from frappe.utils import flt, cint
+from frappe.utils import flt, cint, nowdate
 
-from frappe import _
+from frappe import throw, _
 import frappe.defaults
-
+from frappe.utils import getdate
 from erpnext.controllers.buying_controller import BuyingController
 from erpnext.accounts.utils import get_account_currency
 from frappe.desk.notifications import clear_doctype_notifications
+from erpnext.buying.utils import check_for_closed_status, update_last_purchase_rate
 
 form_grid_templates = {
 	"items": "templates/form_grid/item_grid.html"
@@ -46,17 +47,23 @@ class PurchaseReceipt(BuyingController):
 		}]
 
 	def validate(self):
+		self.validate_posting_time()
 		super(PurchaseReceipt, self).validate()
 
-		self.set_status()
+		if self._action=="submit":
+			self.make_batches('warehouse')
+		else:
+			self.set_status()
+
 		self.po_required()
 		self.validate_with_previous_doc()
-		self.validate_inspection()
 		self.validate_uom_is_integer("uom", ["qty", "received_qty"])
 		self.validate_uom_is_integer("stock_uom", "stock_qty")
 
-		pc_obj = frappe.get_doc('Purchase Common')
-		self.check_for_closed_status(pc_obj)
+		self.check_for_closed_status()
+
+		if getdate(self.posting_date) > getdate(nowdate()):
+			throw(_("Posting Date cannot be future date"))
 
 	def validate_with_previous_doc(self):
 		super(PurchaseReceipt, self).validate_with_previous_doc({
@@ -92,25 +99,17 @@ class PurchaseReceipt(BuyingController):
 			["qty", "warehouse"])
 		return po_qty, po_warehouse
 
-	def validate_inspection(self):
-		for d in self.get('items'):		 #Enter inspection date for all items that require inspection
-			if frappe.db.get_value("Item", d.item_code, "inspection_required") and not d.qa_no:
-				frappe.msgprint(_("Quality Inspection required for Item {0}").format(d.item_code))
-				if self.docstatus==1:
-					raise frappe.ValidationError
-
 	# Check for Closed status
-	def check_for_closed_status(self, pc_obj):
+	def check_for_closed_status(self):
 		check_list =[]
 		for d in self.get('items'):
-			if d.meta.get_field('purchase_order') and d.purchase_order and d.purchase_order not in check_list:
+			if (d.meta.get_field('purchase_order') and d.purchase_order
+				and d.purchase_order not in check_list):
 				check_list.append(d.purchase_order)
-				pc_obj.check_for_closed_status('Purchase Order', d.purchase_order)
+				check_for_closed_status('Purchase Order', d.purchase_order)
 
 	# on submit
 	def on_submit(self):
-		purchase_controller = frappe.get_doc("Purchase Common")
-
 		# Check for Approving Authority
 		frappe.get_doc('Authorization Control').validate_approving_authority(self.doctype,
 			self.company, self.base_grand_total)
@@ -122,7 +121,7 @@ class PurchaseReceipt(BuyingController):
 		self.update_billing_status()
 
 		if not self.is_return:
-			purchase_controller.update_last_purchase_rate(self, 1)
+			update_last_purchase_rate(self, 1)
 
 		# Updating stock ledger should always be called after updating prevdoc status,
 		# because updating ordered qty in bin depends upon updated ordered qty in PO
@@ -142,9 +141,7 @@ class PurchaseReceipt(BuyingController):
 			frappe.throw(_("Purchase Invoice {0} is already submitted").format(self.submit_rv[0][0]))
 
 	def on_cancel(self):
-		pc_obj = frappe.get_doc('Purchase Common')
-
-		self.check_for_closed_status(pc_obj)
+		self.check_for_closed_status()
 		# Check if Purchase Invoice has been submitted against current Purchase Order
 		submitted = frappe.db.sql("""select t1.name
 			from `tabPurchase Invoice` t1,`tabPurchase Invoice Item` t2
@@ -159,7 +156,7 @@ class PurchaseReceipt(BuyingController):
 		self.update_billing_status()
 
 		if not self.is_return:
-			pc_obj.update_last_purchase_rate(self, 0)
+			update_last_purchase_rate(self, 0)
 
 		# Updating stock ledger should always be called after updating prevdoc status,
 		# because updating ordered qty in bin depends upon updated ordered qty in PO
@@ -171,9 +168,6 @@ class PurchaseReceipt(BuyingController):
 			if self.supplier_warehouse:
 				bin = frappe.db.sql("select actual_qty from `tabBin` where item_code = %s and warehouse = %s", (d.rm_item_code, self.supplier_warehouse), as_dict = 1)
 				d.current_stock = bin and flt(bin[0]['actual_qty']) or 0
-
-	def get_rate(self,arg):
-		return frappe.get_doc('Purchase Common').get_rate(arg,self)
 
 	def get_gl_entries(self, warehouse_account=None):
 		from erpnext.accounts.general_ledger import process_gl_map

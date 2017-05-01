@@ -27,14 +27,18 @@ class AccountsReceivableSummary(ReceivablePayableReport):
 			str(self.filters.range3) + _("-Above") + ":Currency/currency:100"]
 
 		if args.get("party_type") == "Customer":
-			columns += [_("Territory") + ":Link/Territory:80"]
+			columns += [
+				_("Territory") + ":Link/Territory:80", 
+				_("Customer Group") + ":Link/Customer Group:120"
+			]
 		if args.get("party_type") == "Supplier":
 			columns += [_("Supplier Type") + ":Link/Supplier Type:80"]
 			
 		columns.append({
 			"fieldname": "currency",
 			"label": _("Currency"),
-			"fieldtype": "Data",
+			"fieldtype": "Link",
+			"options": "Currency",
 			"width": 80
 		})
 
@@ -57,7 +61,7 @@ class AccountsReceivableSummary(ReceivablePayableReport):
 			]
 
 			if args.get("party_type") == "Customer":
-				row += [self.get_territory(party)]
+				row += [self.get_territory(party), self.get_customer_group(party)]
 			if args.get("party_type") == "Supplier":
 				row += [self.get_supplier_type(party)]
 				
@@ -106,7 +110,7 @@ class AccountsReceivableSummary(ReceivablePayableReport):
 		if args.get("party_type") == "Supplier":
 			cols += ["supplier_type", "remarks"]
 		if args.get("party_type") == "Customer":
-			cols += ["territory", "remarks"]
+			cols += ["territory", "customer_group", "remarks"]
 
 		return self.make_data_dict(cols, voucherwise_data)
 

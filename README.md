@@ -8,7 +8,7 @@ Includes: Accounting, Inventory, Manufacturing, CRM, Sales, Purchase, Project Ma
 
 ERPNext is built on the [Frappe](https://github.com/frappe/frappe) Framework, a full-stack web app framework in Python & JavaScript.
 
-- [User Guide](https://manual.erpnext.com)
+- [User Guide](https://frappe.github.io/erpnext/)
 - [Getting Help](http://erpnext.org/getting-help.html)
 - [Discussion Forum](https://discuss.erpnext.com/)
 
@@ -35,6 +35,14 @@ System and user credentials are listed on the download page.
 GNU/General Public License (see LICENSE.txt)
 
 The ERPNext code is licensed as GNU General Public License (v3) and the Documentation is licensed as Creative Commons (CC-BY-SA-3.0) and the copyright is owned by Frappe Technologies Pvt Ltd (Frappe) and Contributors.
+
+---
+
+## Contributing
+
+1. [Pull Request Requirements](https://github.com/frappe/erpnext/wiki/Pull-Request-Guidelines)
+1. [Translations](https://translate.erpnext.com)
+1. [Chart of Accounts](https://charts.erpnext.com)
 
 ---
 

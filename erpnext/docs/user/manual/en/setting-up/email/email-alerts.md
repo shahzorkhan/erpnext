@@ -25,12 +25,12 @@ To setup an Email Alert:
 	3. Value Change: When a particular value in the selected type changes.
 	4. Days Before / Days After: Trigger this alert a few days before or after the **Reference Date.** To set the days, set **Days Before or After**. This can be useful in reminding you of upcoming due dates or reminding you to follow up on certain leads of quotations.
 3. Set additional conditions if you want.
-4. Set the recipients of this alert. The recipient could either be a field of the document or a list of fixed email ids.
+4. Set the recipients of this alert. The recipient could either be a field of the document or a list of fixed Email Addresses.
 5. Compose the message
 
 
 ### Setting a Subject
-You can retrieve the data for a particular field by using `doc.[field_name]`. To use it in your subject / message, you have to surround it with `{{ }}`. These are called [Jinja](http://jinja.pocoo.org/) tags. So, for example to get the name of a document, you use `{{ doc.name }}`. The below example sends an email on saving a Task with the Subject, "TASK##### has been created"
+You can retrieve the data for a particular field by using `doc.[field_name]`. To use it in your subject / message, you have to surround it with `{% raw %}{{ }}{% endraw %}`. These are called [Jinja](http://jinja.pocoo.org/) tags. So, for example to get the name of a document, you use `{% raw %}{{ doc.name }}{% endraw %}`. The below example sends an email on saving a Task with the Subject, "TASK##### has been created"
 
 <img class="screenshot" alt="Setting Subject" src="{{docs_base_url}}/assets/img/setup/email/email-alert-subject.png">
 
@@ -44,7 +44,7 @@ The above example will send an Email Alert when a Task is saved with the status 
 
 ### Setting a Message
 
-You can use both Jinja Tags (`{{ doc.[field_name] }}`) and HTML tags in the message textbox.
+You can use both Jinja Tags (`{% raw %}{{ doc.[field_name] }}{% endraw %}`) and HTML tags in the message textbox.
 
 	{% raw %}<h3>Order Overdue</h3>
 

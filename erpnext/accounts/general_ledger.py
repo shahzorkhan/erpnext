@@ -11,12 +11,12 @@ from erpnext.accounts.doctype.budget.budget import validate_expense_against_budg
 
 class StockAccountInvalidTransaction(frappe.ValidationError): pass
 
-def make_gl_entries(gl_map, cancel=False, adv_adj=False, merge_entries=True, update_outstanding='Yes'):
+def make_gl_entries(gl_map, cancel=False, adv_adj=False, merge_entries=True, update_outstanding='Yes', from_repost=False):
 	if gl_map:
 		if not cancel:
 			gl_map = process_gl_map(gl_map, merge_entries)
 			if gl_map and len(gl_map) > 1:
-				save_entries(gl_map, adv_adj, update_outstanding)
+				save_entries(gl_map, adv_adj, update_outstanding, from_repost)
 			else:
 				frappe.throw(_("Incorrect number of General Ledger Entries found. You might have selected a wrong Account in the transaction."))
 		else:
@@ -78,21 +78,26 @@ def check_if_in_list(gle, gl_map):
 			and cstr(e.get('project')) == cstr(gle.get('project')):
 				return e
 
-def save_entries(gl_map, adv_adj, update_outstanding):
-	validate_account_for_auto_accounting_for_stock(gl_map)
+def save_entries(gl_map, adv_adj, update_outstanding, from_repost=False):
+	if not from_repost:
+		validate_account_for_auto_accounting_for_stock(gl_map)
+		
 	round_off_debit_credit(gl_map)
 
 	for entry in gl_map:
-		make_entry(entry, adv_adj, update_outstanding)
+		make_entry(entry, adv_adj, update_outstanding, from_repost)
+		
 		# check against budget
-		validate_expense_against_budget(entry)
+		if not from_repost:
+			validate_expense_against_budget(entry)
 
-def make_entry(args, adv_adj, update_outstanding):
+def make_entry(args, adv_adj, update_outstanding, from_repost=False):
 	args.update({"doctype": "GL Entry"})
 	gle = frappe.get_doc(args)
 	gle.flags.ignore_permissions = 1
+	gle.flags.from_repost = from_repost
 	gle.insert()
-	gle.run_method("on_update_with_args", adv_adj, update_outstanding)
+	gle.run_method("on_update_with_args", adv_adj, update_outstanding, from_repost)
 	gle.submit()
 
 def validate_account_for_auto_accounting_for_stock(gl_map):
@@ -168,8 +173,8 @@ def delete_gl_entries(gl_entries=None, voucher_type=None, voucher_no=None,
 
 	if not gl_entries:
 		gl_entries = frappe.db.sql("""
-			select account, posting_date, party_type, party, cost_center, fiscal_year,
-			voucher_type, voucher_no, against_voucher_type, against_voucher, cost_center
+			select account, posting_date, party_type, party, cost_center, fiscal_year,voucher_type,
+			voucher_no, against_voucher_type, against_voucher, cost_center, company
 			from `tabGL Entry`
 			where voucher_type=%s and voucher_no=%s""", (voucher_type, voucher_no), as_dict=True)
 

@@ -35,7 +35,7 @@ def create_or_update_cheque_print_format(template_name):
 		</span>
 		<span style="top:%(date_dist_from_top_edge)s cm; left:%(date_dist_from_left_edge)scm;
 			position: absolute;">
-			{{doc.reference_date or '' }}
+			{{ frappe.utils.formatdate(doc.reference_date) or '' }}
 		</span>
 		<span style="top:%(acc_no_dist_from_top_edge)scm;left:%(acc_no_dist_from_left_edge)scm;
 			position: absolute;">
@@ -43,7 +43,7 @@ def create_or_update_cheque_print_format(template_name):
 		</span>
 		<span style="top:%(payer_name_from_top_edge)scm;left: %(payer_name_from_left_edge)scm;
 			position: absolute;">
-			{{doc.party}}
+			{{doc.party_name}}
 		</span>
 		<span style="top:%(amt_in_words_from_top_edge)scm; left:%(amt_in_words_from_left_edge)scm;
 			position: absolute; display: block; width: %(amt_in_word_width)scm;

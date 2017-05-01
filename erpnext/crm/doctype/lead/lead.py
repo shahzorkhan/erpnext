@@ -4,12 +4,11 @@
 from __future__ import unicode_literals
 import frappe
 from frappe import _
-from frappe.utils import cstr, validate_email_add, cint, comma_and, has_gravatar
-from frappe import session
+from frappe.utils import (cstr, validate_email_add, cint, comma_and, has_gravatar, now)
 from frappe.model.mapper import get_mapped_doc
 
 from erpnext.controllers.selling_controller import SellingController
-from erpnext.utilities.address_and_contact import load_address_and_contact
+from frappe.geo.address_and_contact import load_address_and_contact
 from erpnext.accounts.party import set_taxes
 
 sender_field = "email_id"
@@ -34,17 +33,20 @@ class Lead(SellingController):
 		self.set_status()
 		self.check_email_id_is_unique()
 
-		if self.source == 'Campaign' and not self.campaign_name and session['user'] != 'Guest':
-			frappe.throw(_("Campaign Name is required"))
-
 		if self.email_id:
-			validate_email_add(self.email_id, True)
+			if not self.flags.ignore_email_validation:
+				validate_email_add(self.email_id, True)
 
 			if self.email_id == self.lead_owner:
-				# Lead Owner cannot be same as the Lead
-				self.lead_owner = None
+				frappe.throw(_("Lead Owner cannot be same as the Lead"))
+
+			if self.email_id == self.contact_by:
+				frappe.throw(_("Next Contact By cannot be same as the Lead Email Address"))
 
 			self.image = has_gravatar(self.email_id)
+
+		if self.contact_date and self.contact_date < now():
+			frappe.throw(_("Next Contact Date cannot be in the past"))
 
 	def on_update(self):
 		self.add_calendar_event()
@@ -65,7 +67,7 @@ class Lead(SellingController):
 				where email_id=%s and name!=%s""", (self.email_id, self.name))
 
 			if duplicate_leads:
-				frappe.throw(_("Email id must be unique, already exists for {0}")
+				frappe.throw(_("Email Address must be unique, already exists for {0}")
 					.format(comma_and(duplicate_leads)), frappe.DuplicateEntryError)
 
 	def on_trash(self):
@@ -79,6 +81,21 @@ class Lead(SellingController):
 
 	def has_opportunity(self):
 		return frappe.db.get_value("Opportunity", {"lead": self.name, "status": ["!=", "Lost"]})
+
+	def has_quotation(self):
+		return frappe.db.get_value("Quotation", {
+			"lead": self.name,
+			"docstatus": 1,
+			"status": ["!=", "Lost"]
+
+		})
+
+	def has_lost_quotation(self):
+		return frappe.db.get_value("Quotation", {
+			"lead": self.name,
+			"docstatus": 1,
+			"status": "Lost"
+		})
 
 @frappe.whitelist()
 def make_customer(source_name, target_doc=None):
@@ -110,7 +127,7 @@ def _make_customer(source_name, target_doc=None, ignore_permissions=False):
 
 @frappe.whitelist()
 def make_opportunity(source_name, target_doc=None):
-	target_doc = get_mapped_doc("Lead", source_name,
+	target_doc = get_mapped_doc("Lead", source_name, 
 		{"Lead": {
 			"doctype": "Opportunity",
 			"field_map": {
@@ -137,6 +154,9 @@ def make_quotation(source_name, target_doc=None):
 			}
 		}}, target_doc)
 	target_doc.quotation_to = "Lead"
+	target_doc.run_method("set_missing_values")
+	target_doc.run_method("set_other_charges")
+	target_doc.run_method("calculate_taxes_and_totals")
 
 	return target_doc
 

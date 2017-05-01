@@ -67,7 +67,7 @@ def get_balance_qty_from_sle(item_code, warehouse):
 def get_reserved_qty(item_code, warehouse):
 	reserved_qty = frappe.db.sql("""
 		select
-			sum((dnpi_qty / so_item_qty) * (so_item_qty - so_item_delivered_qty))
+			sum(dnpi_qty * ((so_item_qty - so_item_delivered_qty) / so_item_qty))
 		from
 			(
 				(select
@@ -94,7 +94,7 @@ def get_reserved_qty(item_code, warehouse):
 					where name = dnpi_in.parent and docstatus = 1 and status != 'Closed')
 				) dnpi)
 			union
-				(select qty as dnpi_qty, qty as so_item_qty,
+				(select stock_qty as dnpi_qty, qty as so_item_qty,
 					delivered_qty as so_item_delivered_qty, parent, name
 				from `tabSales Order Item` so_item
 				where item_code = %s and warehouse = %s
@@ -230,7 +230,7 @@ def reset_serial_no_status_and_warehouse(serial_nos=None):
 				pass
 
 def repost_all_stock_vouchers():
-	warehouses_with_account = frappe.db.sql_list("""select master_name from tabAccount
+	warehouses_with_account = frappe.db.sql_list("""select warehouse from tabAccount
 		where ifnull(account_type, '') = 'Stock' and (warehouse is not null and warehouse != '')
 		and is_group=0""")
 
@@ -244,7 +244,7 @@ def repost_all_stock_vouchers():
 	i = 0
 	for voucher_type, voucher_no in vouchers:
 		i+=1
-		print i, "/", len(vouchers)
+		print i, "/", len(vouchers), voucher_type, voucher_no
 		try:
 			for dt in ["Stock Ledger Entry", "GL Entry"]:
 				frappe.db.sql("""delete from `tab%s` where voucher_type=%s and voucher_no=%s"""%
