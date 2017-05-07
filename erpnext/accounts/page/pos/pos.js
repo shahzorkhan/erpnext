@@ -282,12 +282,27 @@ erpnext.pos.PointOfSale = erpnext.taxes_and_totals.extend({
 			freeze: true,
 			freeze_message: __("Master data syncing, it might take some time"),
 			callback: function (r) {
+				localStorage.setItem('pos_data', JSON.stringify(r));
 				localStorage.setItem('doc', JSON.stringify(r.message.doc));
 				me.init_master_data(r)
 				me.set_interval_for_si_sync();
 				me.check_internet_connection();
 				if (callback) {
 					callback();
+				}
+			},
+			error: function (r){
+				if(localStorage.pos_data) {
+					var response = JSON.parse(localStorage.getItem('pos_data'));
+					me.init_master_data(response)
+					me.set_interval_for_si_sync();
+					me.check_internet_connection();
+					if (callback) {
+						callback();
+					}
+				}
+				else{
+					frappe.show_not_found("pos_data");
 				}
 			}
 		})
@@ -1461,13 +1476,7 @@ erpnext.pos.PointOfSale = erpnext.taxes_and_totals.extend({
 	},
 
 	print_document: function (html) {
-		var w = window.open();
-		w.document.write(html);
-		w.document.close();
-		setTimeout(function () {
-			w.print();
-			w.close();
-		}, 1000)
+		frappe.app.print_document(html);
 	},
 
 	submit_invoice: function () {
