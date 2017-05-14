@@ -59,6 +59,7 @@ frappe.query_reports["Quoted Item Comparison"] = {
 	},
 	"make_default_supplier_dialog": function (report) {
 		//Get the name of the item to change
+		"use strict";
 		var filters = report.get_values();
 		var item_code = filters.item;
 		
