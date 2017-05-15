@@ -31,7 +31,7 @@ frappe.listview_settings['Task'] = {
 
 		if(task._assign_list) {
 			html += task._assign_list.reduce(
-				(html, user) => html + frappe.avatar(user)
+				function(html, user) { html + frappe.avatar(user)}
 			, '');
 		}
 

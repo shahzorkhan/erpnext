@@ -2,7 +2,7 @@
 // License: GNU General Public License v3. See license.txt
 
 frappe.ui.form.on('Batch', {
-	setup: (frm) => {
+	setup: function(frm) {
 		frm.fields_dict['item'].get_query = function(doc, cdt, cdn) {
 			return {
 				query: "erpnext.controllers.queries.item_query",
@@ -13,9 +13,9 @@ frappe.ui.form.on('Batch', {
 			}
 		}
 	},
-	refresh: (frm) => {
+	refresh: function(frm) {
 		if(!frm.is_new()) {
-			frm.add_custom_button(__("View Ledger"), () => {
+			frm.add_custom_button(__("View Ledger"), function()  {
 				frappe.route_options = {
 					batch_no: frm.doc.name
 				};
@@ -24,12 +24,12 @@ frappe.ui.form.on('Batch', {
 			frm.trigger('make_dashboard');
 		}
 	},
-	make_dashboard: (frm) => {
+	make_dashboard: function(frm) {
 		if(!frm.is_new()) {
 			frappe.call({
 				method: 'erpnext.stock.doctype.batch.batch.get_batch_qty',
 				args: {batch_no: frm.doc.name},
-				callback: (r) => {
+				callback: function(r)  {
 					if(!r.message) {
 						return;
 					}
@@ -71,7 +71,7 @@ frappe.ui.form.on('Batch', {
 								fieldtype: 'Link',
 								options: 'Warehouse'
 							},
-							(data) => {
+							function(data) {
 								frappe.call({
 									method: 'erpnext.stock.doctype.stock_entry.stock_entry_utils.make_stock_entry',
 									args: {
@@ -81,7 +81,7 @@ frappe.ui.form.on('Batch', {
 										from_warehouse: $btn.attr('data-warehouse'),
 										to_warehouse: data.to_warehouse
 									},
-									callback: (r) => {
+									callback: function(r) {
 										frappe.show_alert(__('Stock Entry {0} created',
 											['<a href="#Form/Stock Entry/'+r.message.name+'">' + r.message.name+ '</a>']));
 										frm.refresh();
@@ -108,7 +108,7 @@ frappe.ui.form.on('Batch', {
 								label: __('New Batch ID (Optional)'),
 								fieldtype: 'Data',
 							}],
-							(data) => {
+							function(data) {
 								frappe.call({
 									method: 'erpnext.stock.doctype.batch.batch.split_batch',
 									args: {
@@ -118,7 +118,7 @@ frappe.ui.form.on('Batch', {
 										warehouse: $btn.attr('data-warehouse'),
 										new_batch_id: data.new_batch_id
 									},
-									callback: (r) => {
+									callback: function(r) {
 										frm.refresh();
 									},
 								});
