@@ -982,14 +982,14 @@ erpnext.pos.PointOfSale = erpnext.taxes_and_totals.extend({
 				}
 			});
 			
-			$wrap.append(
-				'<div class="image-view-item btn-more text-muted text-center">'+
-				'	<div class="image-view-body">'+
-				'		<i class="mega-octicon octicon-package"></i>'+
-				'		<div>Load more items</div>'+
-				'	</div>'+
-				'</div>'
-			);
+			$wrap.append(`
+				<div class="image-view-item btn-more text-muted text-center">
+					<div class="image-view-body">
+						<i class="mega-octicon octicon-package"></i>
+						<div>Load more items</div>
+					</div>
+				</div>
+			`);
 
 			me.toggle_more_btn();
 		} else {

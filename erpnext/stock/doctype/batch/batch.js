@@ -34,7 +34,8 @@ frappe.ui.form.on('Batch', {
 						return;
 					}
 
-					var section = frm.dashboard.add_section('<h5 style="margin-top: 0px;">${ __("Stock Levels") }</a></h5>');
+					var section = frm.dashboard.add_section(`<h5 style="margin-top: 0px;">
+						${ __("Stock Levels") }</a></h5>`);
 
 					// sort by qty
 					r.message.sort(function(a, b) { a.qty > b.qty ? 1 : -1 });
@@ -44,20 +45,20 @@ frappe.ui.form.on('Batch', {
 					// show
 					(r.message || []).forEach(function(d) {
 						if(d.qty > 0) {
-							$('<div class="row" style="margin-bottom: 10px;">'+
-							'	<div class="col-sm-3 small" style="padding-top: 3px;">${d.warehouse}</div>'+
-							'	<div class="col-sm-3 small text-right" style="padding-top: 3px;">${d.qty}</div>'+
-							'	<div class="col-sm-6">'+
-							'		<button class="btn btn-default btn-xs btn-move" style="margin-right: 7px;"'+
-							'			data-qty = "${d.qty}"'+
-							'			data-warehouse = "${d.warehouse}">'+
-							'			${__("Move")}</button>'+
-							'		<button class="btn btn-default btn-xs btn-split"'+
-							'			data-qty = "${d.qty}"'+
-							'			data-warehouse = "${d.warehouse}">'+
-							'			${__("Split")}</button>'+
-							'	</div>'+
-							'</div>').appendTo(rows);
+							$(`<div class='row' style='margin-bottom: 10px;'>
+								<div class='col-sm-3 small' style='padding-top: 3px;'>${d.warehouse}</div>
+								<div class='col-sm-3 small text-right' style='padding-top: 3px;'>${d.qty}</div>
+								<div class='col-sm-6'>
+									<button class='btn btn-default btn-xs btn-move' style='margin-right: 7px;'
+										data-qty = "${d.qty}"
+										data-warehouse = "${d.warehouse}">
+										${__('Move')}</button>
+									<button class='btn btn-default btn-xs btn-split'
+										data-qty = "${d.qty}"
+										data-warehouse = "${d.warehouse}">
+										${__('Split')}</button>
+								</div>
+							</div>`).appendTo(rows);
 						}
 					});
 

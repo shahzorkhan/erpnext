@@ -85,18 +85,18 @@ frappe.ui.form.on('Assessment Result Tool', {
 							callback: function(r) {
 								var doc = r.message;
 								var student = doc.student;
-								result_table.find("[data-student=${student}].total-score")
+								result_table.find(`[data-student=${student}].total-score`)
 									.html(doc.total_score + ' ('+ doc.grade + ')');
 								var details = doc.details;
-								result_table.find("tr[data-student=${student}]").addClass('text-muted');
-								result_table.find("input[data-student=${student}]").each(function(el, input) {
+								result_table.find(`tr[data-student=${student}]`).addClass('text-muted');
+								result_table.find(`input[data-student=${student}]`).each(function(el, input) {
 									var $input = $(input);
 									var criteria = $input.data().criteria;
 									var value = $input.val();
 									var grade = details.find(function(d) {
 										return d.assessment_criteria === criteria;
 									}).grade;
-									$input.val("${value} (${grade})");
+									$input.val(`${value} (${grade})`);
 									$input.attr('disabled', true);
 								});
 
