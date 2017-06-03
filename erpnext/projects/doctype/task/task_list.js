@@ -25,9 +25,9 @@ frappe.listview_settings['Task'] = {
 		return [__(doc.status), colors[doc.status], "status,=," + doc.status];
 	},
 	gantt_custom_popup_html: function(ganttobj, task) {
-		var html = `<h5>${ganttobj.name}</h5>`;
-		if(task.project) html += `<p>Project: ${task.project}</p>`;
-		html += `<p>Progress: ${ganttobj.progress}</p>`;
+		var html = "<h5>${ganttobj.name}</h5>";
+		if(task.project) html += "<p>Project: ${task.project}</p>";
+		html += "<p>Progress: ${ganttobj.progress}</p>";
 
 		if(task._assign_list) {
 			html += task._assign_list.reduce(
